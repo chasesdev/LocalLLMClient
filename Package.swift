@@ -16,7 +16,7 @@ var packageDependencies: [Package.Dependency] = [
 #if os(iOS) || os(macOS)
 packageDependencies.append(contentsOf: [
     .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "0.1.21")),
-    .package(url: "https://github.com/ml-explore/mlx-swift-examples", branch: "main"),
+    .package(path: "../internal/mlx-swift-examples"),
     .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.0")
 ])
 #endif
@@ -24,7 +24,8 @@ packageDependencies.append(contentsOf: [
 // MARK: - Package Products
 
 var packageProducts: [Product] = [
-    .library(name: "LocalLLMClient", targets: ["LocalLLMClient"])
+    .library(name: "LocalLLMClient", targets: ["LocalLLMClient"]),
+    .library(name: "LocalLLMClientCore", targets: ["LocalLLMClientCore"])
 ]
 
 #if os(iOS) || os(macOS)
