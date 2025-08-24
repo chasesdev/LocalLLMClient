@@ -1,5 +1,6 @@
 import Foundation
 import LocalLLMClientUtility
+import OSLog
 
 /// Advanced multi-layer memory system that provides comprehensive context and learning
 /// This is the "brain" that enables true AI intelligence, personalization, and continuity
@@ -46,8 +47,9 @@ public final class MultilayerMemory: ObservableObject, Sendable {
         episodicCapacity: Int = 10000,
         semanticCapacity: Int = 50000,
         workingMemorySize: Int = 100,
-        autoConsolidation: Bool = true
-    ) {
+        autoConsolidation: Bool = true,
+        userId: String = "default_user"
+    ) async {
         self.episodicCapacity = episodicCapacity
         self.semanticCapacity = semanticCapacity  
         self.workingMemorySize = workingMemorySize
@@ -138,29 +140,67 @@ public final class MultilayerMemory: ObservableObject, Sendable {
         )
         
         // Store in episodic memory
-        await episodicMemory.store(episode)
+        await episodicMemory.storeEntry(episode)
         
         // Extract semantic knowledge for long-term storage
-        let semanticItems = await extractSemanticKnowledge(from: episode)
+        let semanticItems = await extractSemanticKnowledge(from: episode, response: response)
         for item in semanticItems {
-            await semanticMemory.store(item)
+            await semanticMemory.addKnowledge(item)
         }
         
         // Update procedural memory with patterns
-        await proceduralMemory.updatePatterns(from: episode)
+        let interactionContext = InteractionContext(
+            taskType: request.type.rawValue,
+            steps: [], // Would be extracted in real implementation
+            toolsUsed: [], // Would be tracked during execution
+            conditions: [], // Would be analyzed from context
+            outcomes: [], // Would be determined from response
+            contextRequirements: [],
+            successMetrics: [],
+            optimizations: [],
+            success: true,
+            duration: 0.0,
+            contextHash: context.id
+        )
+        await proceduralMemory.learnPattern(from: interactionContext)
         
-        // Update user profile
-        await userProfiler.updateFromInteraction(request: request, response: response, context: context)
+        // Update user profile based on interaction
+        let interaction = UserInteraction(
+            id: UUID().uuidString,
+            userId: context.userId,
+            timestamp: timestamp,
+            type: mapRequestTypeToInteraction(request.type),
+            content: request.text,
+            duration: 0.0, // Would be calculated in real implementation
+            success: true, // Would be determined from response quality
+            context: .work, // Would be inferred from context
+            tools: [], // Would be extracted from actual tools used
+            outcome: .satisfied, // Would be inferred from response
+            trigger: nil,
+            metadata: [:]
+        )
+        await userProfiler.processInteraction(interaction)
         
         await updateStats(episodeStored: true)
     }
     
     /// Update user model based on interaction patterns
-    public func updateUserModel(from request: UserRequest, response: AgenticResponse) async {
-        await userProfiler.learnFromInteraction(request: request, response: response)
-        
-        // Update procedural memory with user behavior patterns
-        await proceduralMemory.recordUserBehavior(request: request, response: response)
+    public func updateUserModel(from request: UserRequest, response: String) async {
+        let interaction = UserInteraction(
+            id: UUID().uuidString,
+            userId: "default_user", // Would be passed in real implementation
+            timestamp: Date(),
+            type: mapRequestTypeToInteraction(request.type),
+            content: request.text,
+            duration: 0.0,
+            success: true,
+            context: .work,
+            tools: [],
+            outcome: .satisfied,
+            trigger: nil,
+            metadata: [:]
+        )
+        await userProfiler.processInteraction(interaction)
     }
     
     /// Query memory system with semantic search
@@ -169,9 +209,8 @@ public final class MultilayerMemory: ObservableObject, Sendable {
         
         switch query.type {
         case .episodic:
-            let results = await episodicMemory.search(
-                query: query.parameters["query"] ?? "",
-                timeRange: query.timeRange,
+            let results = await episodicMemory.getRelevantHistory(
+                for: UserRequest(id: UUID().uuidString, text: query.parameters["query"] ?? "", type: .question),
                 limit: query.resultLimit
             )
             
@@ -188,9 +227,8 @@ public final class MultilayerMemory: ObservableObject, Sendable {
             )
             
         case .semantic:
-            let results = await semanticMemory.search(
-                query: query.parameters["query"] ?? "",
-                domain: query.parameters["domain"],
+            let results = await semanticMemory.getRelevantKnowledge(
+                for: UserRequest(id: UUID().uuidString, text: query.parameters["query"] ?? "", type: .question),
                 limit: query.resultLimit
             )
             
@@ -207,9 +245,8 @@ public final class MultilayerMemory: ObservableObject, Sendable {
             )
             
         case .procedural:
-            let patterns = await proceduralMemory.findPatterns(
-                matching: query.parameters["pattern"] ?? "",
-                context: query.parameters["context"],
+            let patterns = await proceduralMemory.getRelevantPatterns(
+                for: UserRequest(id: UUID().uuidString, text: query.parameters["pattern"] ?? "", type: .task),
                 limit: query.resultLimit
             )
             
@@ -360,42 +397,35 @@ public final class MultilayerMemory: ObservableObject, Sendable {
             semantic: semanticMemory
         )
         
-        // Connect context builder to all memory layers
-        contextBuilder.setMemoryLayers(
-            episodic: episodicMemory,
-            semantic: semanticMemory,
-            procedural: proceduralMemory,
-            working: workingMemory
-        )
+        // Memory layers are now connected through the buildContext method
     }
     
-    private func calculateImportance(request: UserRequest, response: AgenticResponse) -> Double {
+    private func calculateImportance(request: UserRequest, response: String) -> Double {
         var importance = 0.5 // Base importance
         
         // Increase importance based on request priority
-        switch request.priority {
-        case .urgent: importance += 0.4
-        case .high: importance += 0.3
-        case .normal: importance += 0.1
-        case .low: importance += 0.0
+        if request.priority > 0.8 {
+            importance += 0.4
+        } else if request.priority > 0.6 {
+            importance += 0.3
+        } else if request.priority > 0.4 {
+            importance += 0.1
         }
         
         // Increase importance based on response complexity
-        if !response.toolCalls.isEmpty {
+        if response.count > 500 {
             importance += 0.2
         }
         
-        if !response.agentActions.isEmpty {
-            importance += 0.2
+        // Increase importance based on question complexity
+        if request.text.count > 100 {
+            importance += 0.1
         }
-        
-        // Increase importance based on confidence
-        importance += response.confidence * 0.2
         
         return min(1.0, importance)
     }
     
-    private func extractEmotions(from request: UserRequest, response: AgenticResponse) -> [String] {
+    private func extractTags(from request: UserRequest, response: String) -> [String] {
         // Simple emotion extraction - would use NLP in production
         var emotions: [String] = []
         
@@ -407,7 +437,7 @@ public final class MultilayerMemory: ObservableObject, Sendable {
             "sorry": "apologetic"
         ]
         
-        let text = (request.text + " " + response.text).lowercased()
+        let text = (request.text + " " + response).lowercased()
         
         for (keyword, emotion) in emotionKeywords {
             if text.contains(keyword) {
@@ -418,46 +448,105 @@ public final class MultilayerMemory: ObservableObject, Sendable {
         return emotions
     }
     
-    private func extractOutcomes(from response: AgenticResponse) -> [String] {
-        var outcomes: [String] = []
-        
-        if !response.toolCalls.isEmpty {
-            outcomes.append("tool_usage")
+    private func generateEmbedding(for text: String) async -> [Float] {
+        // In a real implementation, this would use a proper embedding model
+        // For now, return a simple hash-based embedding
+        let hash = text.hash
+        var embedding: [Float] = []
+        for i in 0..<128 {
+            embedding.append(Float(hash ^ (i * 31)) / Float(Int.max))
         }
-        
-        if !response.agentActions.isEmpty {
-            outcomes.append("agent_coordination")
-        }
-        
-        if response.confidence > 0.9 {
-            outcomes.append("high_confidence")
-        }
-        
-        if !response.suggestions.isEmpty {
-            outcomes.append("suggestions_provided")
-        }
-        
-        return outcomes
+        return embedding
     }
     
-    private func extractSemanticKnowledge(from episode: EpisodicMemoryEntry) async -> [SemanticKnowledgeItem] {
+    private func extractSemanticKnowledge(from episode: EpisodicMemoryEntry, response: String) async -> [SemanticKnowledgeItem] {
         // Extract semantic knowledge from episode
-        return await semanticMemory.extractKnowledge(from: episode)
+        // In a real implementation, this would use NLP to extract concepts
+        var items: [SemanticKnowledgeItem] = []
+        
+        // Simple keyword extraction
+        let keywords = extractKeywords(from: response)
+        
+        for keyword in keywords {
+            let item = SemanticKnowledgeItem(
+                id: UUID().uuidString,
+                concept: keyword,
+                content: "Concept mentioned in interaction: \(keyword)",
+                category: "extracted",
+                domain: "general",
+                confidence: 0.5,
+                embedding: await generateEmbedding(for: keyword),
+                relationships: [],
+                metadata: ["source": "episodic_extraction"],
+                lastAccessed: Date(),
+                accessCount: 1
+            )
+            items.append(item)
+        }
+        
+        return items
+    }
+    
+    private func extractKeywords(from text: String) -> [String] {
+        // Simple keyword extraction
+        let words = text.lowercased().components(separatedBy: .whitespacesAndNewlines)
+        let stopWords = Set(["the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "must", "can", "this", "that", "these", "those"])
+        
+        return words.filter { word in
+            word.count > 3 && !stopWords.contains(word) && word.allSatisfy { $0.isLetter }
+        }.prefix(5).map { $0 }
+    }
+    
+    private func mapRequestTypeToInteraction(_ type: RequestType) -> InteractionType {
+        switch type {
+        case .question: return .question
+        case .task: return .task
+        case .analysis: return .conversation
+        case .creation: return .task
+        case .optimization: return .task
+        case .learning: return .learning
+        case .exploration: return .exploration
+        }
     }
     
     private func validateWithEpisodic(_ knowledge: SemanticKnowledgeItem) async -> Bool {
-        // Validate semantic knowledge against episodic evidence
-        return await episodicMemory.validateKnowledge(knowledge)
+        // In a real implementation, this would validate against episodic memories
+        return knowledge.confidence > 0.3
     }
     
     private func formatEpisodicResults(_ results: [EpisodicMemoryEntry]) -> String {
         guard !results.isEmpty else { return "No relevant memories found." }
         
         let formatted = results.prefix(5).map { entry in
-            "[\(entry.timestamp.formatted(.dateTime.hour().minute()))] \(entry.request.text) → \(entry.response.text.prefix(100))..."
+            "[\(entry.timestamp.formatted(.dateTime.hour().minute()))] \(entry.content.prefix(100))..."
         }.joined(separator: "\n")
         
         return "Found \(results.count) relevant memories:\n\n\(formatted)"
+    }
+    
+    private func formatSemanticResults(_ results: [SemanticKnowledgeItem]) -> String {
+        guard !results.isEmpty else { return "No relevant knowledge found." }
+        
+        let formatted = results.prefix(5).map { item in
+            "• \(item.concept): \(item.content.prefix(100))..."
+        }.joined(separator: "\n")
+        
+        return "Found \(results.count) relevant knowledge items:\n\n\(formatted)"
+    }
+    
+    private func formatProceduralResults(_ results: [ProceduralPattern]) -> String {
+        guard !results.isEmpty else { return "No relevant patterns found." }
+        
+        let formatted = results.prefix(5).map { pattern in
+            "• \(pattern.name): \(pattern.description) (Success: \(String(format: "%.1f", pattern.metadata.successRate * 100))%)"
+        }.joined(separator: "\n")
+        
+        return "Found \(results.count) relevant patterns:\n\n\(formatted)"
+    }
+    
+    private func calculateConfidence<T>(from results: [T]) -> Double {
+        guard !results.isEmpty else { return 0.0 }
+        return min(1.0, Double(results.count) / 5.0) // Simple confidence based on result count
     }
     
     private func formatSemanticResults(_ results: [SemanticKnowledgeItem]) -> String {

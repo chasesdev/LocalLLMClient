@@ -16,7 +16,7 @@ public final class AgenticCore: ObservableObject, Sendable {
     public let toolEcosystem: DynamicToolEcosystem
     
     /// Multi-layer memory system for perfect recall
-    public let memorySystem: MultilayerMemory
+    public private(set) var memorySystem: MultilayerMemory!
     
     /// Multi-agent orchestration for complex tasks
     public let agentOrchestrator: MultiAgentSystem
@@ -56,11 +56,7 @@ public final class AgenticCore: ObservableObject, Sendable {
             securityLevel: configuration.securityConfiguration.toolSecurityLevel
         )
         
-        self.memorySystem = MultilayerMemory(
-            episodicCapacity: configuration.memoryConfiguration.episodicCapacity,
-            semanticCapacity: configuration.memoryConfiguration.semanticCapacity,
-            workingMemorySize: configuration.memoryConfiguration.workingMemorySize
-        )
+        // Memory system will be initialized asynchronously in initialize() method
         
         self.agentOrchestrator = MultiAgentSystem(
             maxConcurrentAgents: configuration.agentConfiguration.maxConcurrentAgents,
@@ -94,6 +90,14 @@ public final class AgenticCore: ObservableObject, Sendable {
             try await dataLayer.initialize()
             try await promptCache.initialize()
             try await toolEcosystem.initialize()
+            // Initialize memory system
+            self.memorySystem = await MultilayerMemory(
+                episodicCapacity: configuration.memoryConfiguration.episodicCapacity,
+                semanticCapacity: configuration.memoryConfiguration.semanticCapacity,
+                workingMemorySize: configuration.memoryConfiguration.workingMemorySize,
+                autoConsolidation: true,
+                userId: "default_user" // Would be passed from session context
+            )
             try await memorySystem.initialize()
             try await agentOrchestrator.initialize()
             try await proactiveEngine.initialize()
@@ -256,13 +260,13 @@ public final class AgenticCore: ObservableObject, Sendable {
         // Store in episodic memory
         await memorySystem.storeEpisode(
             request: request,
-            response: response,
+            response: response.text,
             context: context,
             timestamp: Date()
         )
         
         // Update user model
-        await memorySystem.updateUserModel(from: request, response: response)
+        await memorySystem.updateUserModel(from: request, response: response.text)
         
         // Learn tool patterns
         await toolEcosystem.analyzeForToolLearning(
