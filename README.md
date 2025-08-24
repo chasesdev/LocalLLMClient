@@ -5,6 +5,7 @@
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Ftattn%2FLocalLLMClient%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/tattn/LocalLLMClient)
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Ftattn%2FLocalLLMClient%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/tattn/LocalLLMClient)
 
+> **Fork Notice**: This is an enhanced fork of [tattn/LocalLLMClient](https://github.com/tattn/LocalLLMClient) with additional improvements and features.
 
 A Swift package to interact with local Large Language Models (LLMs) on Apple platforms.
 
@@ -42,15 +43,31 @@ A Swift package to interact with local Large Language Models (LLMs) on Apple pla
 - Multimodal (experimental)
 - Tool calling (experimental)
 
+## Fork Enhancements
+
+This fork includes several improvements over the original:
+
+- **Enhanced Memory Management**: Improved memory handling and optimization (commits: mem p1, mem p2)
+- **Advanced Tool Calling**: Upgraded tool calling capabilities and agentic workflows
+- **Pause/Resume Functionality**: Added ability to pause and resume LLM inference sessions
+- **Local Model Convenience**: Added convenience initializers and loading methods for LocalModel in LLMSession
+- **Lifecycle Management**: Improved lifecycle handling for better resource management
+- **Destination Control**: Added destination parameter to DownloadModel and exposed `isDownloaded` property
+- **Thread Safety**: Made LLMSession conform to Sendable for better concurrency support
+- **Observability**: Removed duplicate observability code for cleaner architecture
+- **Updated Dependencies**: Regular updates to llama.cpp dependency for latest features and fixes
+
 ## Installation
 
 Add the following dependency to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/tattn/LocalLLMClient.git", branch: "main")
+    .package(url: "https://github.com/chasesdev/LocalLLMClient.git", branch: "main")
 ]
 ```
+
+> **Note**: To use the original version, use `https://github.com/tattn/LocalLLMClient.git` instead.
 
 ## Usage
 
@@ -498,10 +515,21 @@ swift run LocalLLMCLI --model /path/to/your/model.gguf "Your prompt here"
 - iOS 16.0+ / macOS 14.0+
 - Xcode 16.0+
 
+## Contributing
+
+This fork welcomes contributions! Please feel free to:
+- Report issues or bugs
+- Submit feature requests
+- Open pull requests with improvements
+
+For major changes, please open an issue first to discuss the proposed changes.
+
 ## Acknowledgements
 
 This package uses [llama.cpp](https://github.com/ggml-org/llama.cpp), [Apple's MLX](https://opensource.apple.com/projects/mlx/) and [Foundation Models framework](https://developer.apple.com/documentation/foundationmodels) for model inference.
 
+Special thanks to [tattn](https://github.com/tattn) for creating the original LocalLLMClient package.
+
 ---
 
-[Support this project :heart:](https://github.com/sponsors/tattn)
+[Support the original project :heart:](https://github.com/sponsors/tattn)
